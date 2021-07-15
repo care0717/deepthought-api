@@ -5,6 +5,7 @@ import (
 	"github.com/care0717/deepthought-api/grpc/proto/deepthought"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
@@ -24,7 +25,10 @@ func (s *Server) Boot(req *deepthought.BootRequest, stream deepthought.Compute_B
 			return nil
 		case <-time.After(1 * time.Second):
 		}
-		if err := stream.Send(&deepthought.BootResponse{Message: "I think therefore i am."}); err != nil {
+		if err := stream.Send(&deepthought.BootResponse{
+			Message: "I think therefore i am.",
+			Ts:      timestamppb.Now(),
+		}); err != nil {
 			return err
 		}
 	}

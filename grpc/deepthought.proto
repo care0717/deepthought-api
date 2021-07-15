@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package deepthought;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/care0717/deepthought-api/grpc/proto/deepthought";
 
 message BootRequest {
@@ -10,6 +12,7 @@ message BootRequest {
 
 message BootResponse {
     string message = 1;
+    google.protobuf.Timestamp ts = 2;
 }
 
 message InferRequest {
