@@ -32,8 +32,13 @@ var (
 				time.Sleep(time.Duration(timeout) * time.Millisecond)
 				cancel()
 			}(cancel)
-
-			stream, err := cc.Boot(ctx, &deepthought.BootRequest{})
+			silent, err := cmd.Flags().GetBool("silent")
+			if err != nil {
+				return err
+			}
+			stream, err := cc.Boot(ctx, &deepthought.BootRequest{
+				Silent: silent,
+			})
 			if err != nil {
 				return err
 			}
@@ -62,5 +67,6 @@ var (
 )
 
 func init() {
+	bootCmd.Flags().Bool("silent", false, "silent boot")
 	rootCmd.AddCommand(bootCmd)
 }
