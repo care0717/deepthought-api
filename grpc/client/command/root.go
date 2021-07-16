@@ -2,6 +2,7 @@ package command
 
 import (
 	"github.com/spf13/cobra"
+	"time"
 )
 
 var (
@@ -14,6 +15,8 @@ var (
 	addr    string
 	timeout int
 )
+
+const credRefreshingInterval = 500 * time.Millisecond
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&addr, "addr", "127.0.0.1:13333", "grpc server address")
