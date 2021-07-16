@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 	"io"
 	"time"
@@ -19,7 +20,10 @@ var (
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			conn, err := grpc.Dial(addr, grpc.WithInsecure())
+			kp := keepalive.ClientParameters{
+				Time: 1 * time.Minute,
+			}
+			conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithKeepaliveParams(kp))
 			if err != nil {
 				return err
 			}
