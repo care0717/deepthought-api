@@ -30,11 +30,8 @@ var (
 
 			cc := deepthought.NewComputeClient(conn)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			go func(cancel func()) {
-				time.Sleep(time.Duration(timeout) * time.Millisecond)
-				cancel()
-			}(cancel)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+			defer cancel()
 
 			resp, err := cc.Infer(ctx, &deepthought.InferRequest{Query: query})
 			if err != nil {
