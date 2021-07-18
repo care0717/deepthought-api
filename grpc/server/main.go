@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/tls/certprovider/pemfile"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/security/advancedtls"
 	"google.golang.org/grpc/security/advancedtls/testdata"
@@ -102,9 +104,13 @@ func main() {
 			interceptor.Unary(),
 		)),
 	)
+
 	auth.RegisterAuthServer(serv, authServer)
 	deepthought.RegisterComputeServer(serv, &DeepthoughtServer{})
 	grpc_prometheus.Register(serv)
+	hs := health.NewServer()
+	healthgrpc.RegisterHealthServer(serv, hs)
+	hs.Resume()
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	go func() {
