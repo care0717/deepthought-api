@@ -2,20 +2,23 @@ package main
 
 import (
 	"context"
+	"github.com/care0717/deepthought-api/grpc/proto/auth"
 	"github.com/care0717/deepthought-api/grpc/proto/deepthought"
+	repository2 "github.com/care0717/deepthought-api/grpc/server/repository"
+	service2 "github.com/care0717/deepthought-api/grpc/server/service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
-type Server struct {
+type DeepthoughtServer struct {
 	deepthought.UnimplementedComputeServer
 }
 
-var _ deepthought.ComputeServer = &Server{}
+var _ deepthought.ComputeServer = &DeepthoughtServer{}
 
-func (s *Server) Boot(req *deepthought.BootRequest, stream deepthought.Compute_BootServer) error {
+func (s *DeepthoughtServer) Boot(req *deepthought.BootRequest, stream deepthought.Compute_BootServer) error {
 	if req.Silent {
 		return nil
 	}
@@ -34,7 +37,7 @@ func (s *Server) Boot(req *deepthought.BootRequest, stream deepthought.Compute_B
 	}
 }
 
-func (s *Server) Infer(ctx context.Context, req *deepthought.InferRequest) (*deepthought.InferResponse, error) {
+func (s *DeepthoughtServer) Infer(ctx context.Context, req *deepthought.InferRequest) (*deepthought.InferResponse, error) {
 	switch req.Query {
 	case "Life", "Universe", "Everything":
 	default:
@@ -51,4 +54,35 @@ func (s *Server) Infer(ctx context.Context, req *deepthought.InferRequest) (*dee
 	}
 
 	return nil, status.Error(codes.DeadlineExceeded, "It would take longer")
+}
+
+type AuthServer struct {
+	userStore  repository2.UserStore
+	jwtManager *service2.JWTManager
+	auth.UnimplementedAuthServer
+}
+
+var _ auth.AuthServer = &AuthServer{}
+
+func NewAuthServer(userStore repository2.UserStore, jwtManager *service2.JWTManager) *AuthServer {
+	return &AuthServer{userStore: userStore, jwtManager: jwtManager}
+}
+
+func (s *AuthServer) Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error) {
+	user, err := s.userStore.Find(req.GetUsername())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "cannot find user: %v", err)
+	}
+
+	if user == nil || !user.IsCorrectPassword(req.GetPassword()) {
+		return nil, status.Errorf(codes.NotFound, "incorrect username/password")
+	}
+
+	token, err := s.jwtManager.Generate(user)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "cannot generate access token")
+	}
+
+	res := &auth.LoginResponse{AccessToken: token}
+	return res, nil
 }

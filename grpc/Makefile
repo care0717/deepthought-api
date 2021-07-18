@@ -1,22 +1,22 @@
 MODULE := $(shell awk '/^module / {print $$2}' go.mod)
+PB_FILES:=$(shell find . -type f -name '*.proto' -print)
+GOPB_FILES:=$(PB_FILES:%.proto=%.pb.go)
 
-all: deepthought.html deepthought.pb.go deepthought_grpc.pb.go bin/server bin/client
+all: $(GOPB_FILES) bin/server bin/client
 
-deepthought.html: deepthought.proto
-	protoc --doc_out=. --doc_opt=html,$@ $<
+$(GOPB_FILES): $(PB_FILES)
+	@protoc \
+		--go_out=module=$(MODULE):. \
+		--go-grpc_out=module=$(MODULE):. \
+		--doc_out=. --doc_opt=html,proto_doc.html \
+		$(@:%.pb.go=%.proto)
 
-deepthought.pb.go: deepthought.proto
-	protoc --go_out=module=$(MODULE):. $<
-
-deepthought_grpc.pb.go: deepthought.proto
-	protoc --go-grpc_out=module=$(MODULE):. $<
-
-bin/server: deepthought.pb.go deepthought_grpc.pb.go $(wildcard server/*.go)
+bin/server: $(GOPB_FILES) $(wildcard server/*.go)
 	go build -o $@ ./server
 
-bin/client: deepthought.pb.go deepthought_grpc.pb.go $(wildcard client/*.go)
+bin/client: $(GOPB_FILES) $(wildcard client/*.go)
 	go build -o $@ ./client
 
 .PHONY: clean
 clean:
-	rm -rf deepthought.index proto bin
+	rm -rf *.html proto bin

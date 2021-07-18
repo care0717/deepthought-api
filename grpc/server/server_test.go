@@ -84,7 +84,7 @@ func TestServer_Infer(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := &Server{}
+			s := &DeepthoughtServer{}
 			got, err := s.Infer(tt.args.ctx, tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Infer() error = %v, wantErr %v", err, tt.wantErr)

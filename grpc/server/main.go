@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/care0717/deepthought-api/grpc/proto/auth"
 	"github.com/care0717/deepthought-api/grpc/proto/deepthought"
+	model2 "github.com/care0717/deepthought-api/grpc/server/model"
+	repository2 "github.com/care0717/deepthought-api/grpc/server/repository"
+	service2 "github.com/care0717/deepthought-api/grpc/server/service"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -23,6 +27,8 @@ const (
 	portNumber             = 13333
 	promPort               = 18888
 	credRefreshingInterval = 1 * time.Minute
+	secretKey              = "secret"
+	tokenDuration          = 15 * time.Minute
 )
 
 func main() {
@@ -75,19 +81,29 @@ func main() {
 		logger.Fatal(fmt.Sprintf("advancedtls.NewServerCreds(%v) failed: %v", options, err))
 	}
 
+	userStore := repository2.NewInMemoryUserStore()
+	if err = seedUsers(userStore); err != nil {
+		logger.Fatal(fmt.Sprintf("advancedtls.NewServerCreds(%v) failed: %v", options, err))
+	}
+	jwtManager := service2.NewJWTManager(secretKey, tokenDuration)
+	authServer := NewAuthServer(userStore, jwtManager)
+	interceptor := service2.NewAuthInterceptor(jwtManager, accessibleRoles())
 	serv := grpc.NewServer(
 		grpc.Creds(serverTLSCreds),
 		grpc.KeepaliveEnforcementPolicy(kep),
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			grpc_prometheus.StreamServerInterceptor,
 			grpc_zap.StreamServerInterceptor(logger),
+			interceptor.Stream(),
 		)),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			grpc_prometheus.UnaryServerInterceptor,
 			grpc_zap.UnaryServerInterceptor(logger),
+			interceptor.Unary(),
 		)),
 	)
-	deepthought.RegisterComputeServer(serv, &Server{})
+	auth.RegisterAuthServer(serv, authServer)
+	deepthought.RegisterComputeServer(serv, &DeepthoughtServer{})
 	grpc_prometheus.Register(serv)
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -101,4 +117,29 @@ func main() {
 		logger.Fatal(fmt.Sprintf("failed to listen: %v", err))
 	}
 	logger.Fatal(fmt.Sprintf("serve failed: %v", serv.Serve(l)))
+}
+
+func seedUsers(userStore repository2.UserStore) error {
+	user, err := model2.NewUser("admin1", "secret", "admin")
+	if err != nil {
+		return err
+	}
+	err = userStore.Save(user)
+	if err != nil {
+		return err
+	}
+	user, err = model2.NewUser("user1", "secret", "user")
+	if err != nil {
+		return err
+	}
+	return userStore.Save(user)
+}
+
+func accessibleRoles() map[string][]string {
+	const deepthoughtServicePath = "/deepthought.Compute/"
+
+	return map[string][]string{
+		deepthoughtServicePath + "Boot":  {"admin"},
+		deepthoughtServicePath + "Infer": {"admin", "user"},
+	}
 }
